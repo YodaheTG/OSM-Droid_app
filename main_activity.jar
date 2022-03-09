@@ -1,0 +1,185 @@
+package com.example.kotlin_ask_loc
+
+//import android.preference.PreferenceManager
+//import com.niels_ole.customtileserver.R
+import android.Manifest
+import android.content.pm.PackageManager
+import android.location.LocationManager
+import android.os.Bundle
+import android.util.Log
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.preference.PreferenceManager
+import io.socket.client.Socket
+import org.osmdroid.config.Configuration.getInstance
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.Marker
+import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
+import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
+
+
+class MainActivity : AppCompatActivity() {
+
+    private lateinit var map : MapView;
+    private var permreq = mutableListOf<String>()
+    private lateinit var location: GpsMyLocationProvider;
+    private lateinit var locationf:MyLocationNewOverlay;
+    private  lateinit var startPoint:GeoPoint;
+    lateinit var mSocket: Socket
+
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        //onrequest ()
+        super.onCreate(savedInstanceState);
+
+        //handle permissions first, before map is created. not depicted here
+        onrequest ()
+        //load/initialize the osmdroid configuration, this can be done
+        // This won't work unless you have imported this: org.osmdroid.config.Configuration.*
+        getInstance().load(this, PreferenceManager.getDefaultSharedPreferences(this));
+        //setting this before the layout is inflated is a good idea
+        //it 'should' ensure that the map has a writable location for the map cache, even without permissions
+        //if no tiles are displayed, you can try overriding the cache path using Configuration.getInstance().setCachePath
+        //see also StorageUtils
+        //note, the load method also sets the HTTP User Agent to your application's package name, if you abuse osm's
+        //tile servers will get you banned based on this string.
+
+        //inflate and create the map
+
+        setContentView(R.layout.activity_main);
+        //onrequest()
+        //findViewById(R.id.yod)
+        map = findViewById<MapView>(R.id.map)
+        location = GpsMyLocationProvider(baseContext)
+        location.addLocationSource(LocationManager.NETWORK_PROVIDER);
+        location.addLocationSource(LocationManager.GPS_PROVIDER);
+        //map.setTileSource(TileSourceFactory.MAPNIK);
+        locationf = MyLocationNewOverlay(location, map)
+        //locationf.enableMyLocation()
+        //var tt = this.locationf.myLocationProvider.lastKnownLocation.latitude
+        //var uu = this.locationf.myLocationProvider.lastKnownLocation.longitude
+
+        val mapController = map.controller
+       // val IMapController mapControllerb = map.getController();
+        //mapController.setZoom(9.5)
+        //startPoint =  GeoPoint(8.9, 39.8)
+        //mapController.setCenter(startPoint)
+            //startPoint =  GeoPoint(8.9, 39.8)
+            //mapController.setCenter(startPoint)
+            //mapController.setZoom(9.5)
+            locationf.enableMyLocation()
+            locationf.enableFollowLocation()
+            locationf.isDrawAccuracyEnabled = true
+            //mapController.setCenter(startPoint);
+
+            locationf.runOnFirstFix {
+                runOnUiThread {
+
+                    mapController.setZoom(18.00)
+                    var locc = locationf.myLocationProvider.lastKnownLocation
+                    var loccc = GeoPoint(2.2944, 48.8583)
+                    var loccb = GeoPoint(locc.latitude,locc.longitude)
+
+                    // mapController.setZoom(18.00)
+                     //mapController.setCenter(loccc);
+
+                     val startMarker = Marker(map)
+                     startMarker.setPosition(loccc)
+                     map.getOverlays().add(startMarker);
+
+                     mapController.animateTo(loccc)
+
+                }
+                //mapController.setZoom(10.000)
+            }
+        //mapController.setZoom(18.000)
+        //mapController.animateTo(loccc)
+        //mapController.setZoom(18.000)
+        SocketHandler.setSocket();
+        SocketHandler.establishConnection();
+        SocketHandler.emitConnection();
+        //SocketHandler.closeConnection();
+
+        //try {
+
+          //  mSocket = IO.socket("http://10.0.2.2:3000");
+            //mSocket.connect();
+            //mSocket.emit("join", sttring)
+        //}catch (e: URISyntaxException) {
+          //  e.printStackTrace();
+
+        //}
+
+
+
+        //SocketHandler.establishConnection()
+        //SocketHandler.setSocket()
+        
+        //var tt = locationf.myLocation
+       // Log.println(3)
+        //map.getOverlays().add(this.locationf)
+
+    }
+
+
+    override fun onResume() {
+        super.onResume();
+        //this will refresh the osmdroid configuration on resuming.
+        //if you make changes to the configuration, use
+        //SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        //Configuration.getInstance().load(this, PreferenceManager.getDefaultSharedPreferences(this));
+        map.onResume(); //needed for compass, my location overlays, v6.0.0 and up
+    }
+
+    override fun onPause() {
+        super.onPause();
+        //this will refresh the osmdroid configuration on resuming.
+        //if you make changes to the configuration, use
+        //SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        //Configuration.getInstance().save(this, prefs);
+        map.onPause();  //needed for compass, my location overlays, v6.0.0 and up
+    }
+    private  fun haspermission() =
+            ActivityCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)== PackageManager.PERMISSION_GRANTED
+    private  fun hascorpermission() =
+            ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)== PackageManager.PERMISSION_GRANTED
+    private  fun hasfinpermission() =
+            ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)== PackageManager.PERMISSION_GRANTED
+    private  fun hasbacpermission() =
+            ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION)== PackageManager.PERMISSION_GRANTED
+    private  fun hasintpermission() =
+            ActivityCompat.checkSelfPermission(this, Manifest.permission.INTERNET)== PackageManager.PERMISSION_GRANTED
+
+    private fun onrequest (){
+        var permreq = mutableListOf<String>()
+        if(!haspermission()){
+            permreq.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        }
+        if(!hascorpermission()){
+            permreq.add(Manifest.permission.ACCESS_COARSE_LOCATION)
+        }
+        if(!hasfinpermission()){
+            permreq.add(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+
+        if(!hasintpermission()){
+            permreq.add(Manifest.permission.INTERNET)
+        }
+        if (permreq.isNotEmpty()){
+            ActivityCompat.requestPermissions(this, permreq.toTypedArray(), 0)
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 0 && grantResults.isNotEmpty()){
+            for (i in grantResults.indices){
+                if (grantResults[i] == PackageManager.PERMISSION_GRANTED){
+                    Log.d("haspermission", "${permissions[i]} granted.")
+                }
+            }
+        }
+    }
+
+}
